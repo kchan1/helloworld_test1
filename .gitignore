@@ -1,0 +1,4 @@
+# We want to ignore object files, temp, and our binary
+*.o
+*~
+encode
