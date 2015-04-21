@@ -4,7 +4,7 @@ OBJ=$(SRC:.cpp=.o)
 CXXFLAGS=-O2
 
 all: $(OBJ)
-	$(CXX) $(OBJ) -o $(OUT)
+	$(CXX) $(OBJ) -std=c++11 -o $(OUT)
 clean:
 	$(RM) $(OUT)
 	$(RM) $(OBJ)

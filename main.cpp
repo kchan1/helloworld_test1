@@ -3,15 +3,125 @@
 #include <stdlib.h>
 #include <cmath>
 
-void subband_decomp(){
 
+void horizontal_convolution(double* &image, int image_length,  double* filter, int filter_length){
+	double copy[image_length];
+	double pass_value;
+	for (int i=0; i<image_length;i++){
+		copy[i] = image[i];
+	}
+
+	for (int i = 0; i<image_length; i++){
+		pass_value = 0;		
+		for (int j = 0; j<filter_length; j++){
+			if (i-j < 0){
+				continue;
+			}
+			pass_value +=filter[j]*copy[i-j];
+		}
+		image[i]=pass_value;
+	}
+
+	return;
+}
+
+void vertical_convolution(double** &image, int height, int width,  double* filter, int filter_length){
+	double copy[height][width];
+	double pass_value;
+	for (int i=0; i<height ;i++){
+		for (int j = 0; j<width ; j++){
+			copy[i][j] = image[i][j];
+		}
+	}
+
+	for (int i=0; i<width; i++){
+		for(int j = 0 ; j<height; j++){
+			pass_value=0;
+			for (int k =0; k<filter_length; k++){
+				if(j-k < 0){
+					continue;
+				}
+				pass_value+=filter[k]*image[j-k][i];
+			}
+			image[j][i]=pass_value;
+		}
+	}
+
+
+	return;
+}
+
+void subband_decomp(unsigned char** &image_data, int height, int width){
+
+	double low_pass_filter[7] = {.1,0,-.3,.2,.7,.6,.2};
+	double high_pass_filter[10] = {-.2,.6,-.7,.2,.3,0,-.1,0,0,0};
+	double** round1_low = new double*[height];
+	double** round1_high = new double*[height];
+	double** round2_low = new double*[height];
+	double** round2_high = new double*[height];
+	for (int i = 0; i<height; i++){
+		round1_low[i] = new double[width];
+		round1_high[i] = new double[width];
+		round2_low[i] = new double[width];
+		round2_high[i] = new double[width];
+	}
+	for(int i = 0; i<height; i++){
+		for (int j = 0; j<width; j++){
+			round1_low[i][j]=(double)image_data[i][j];
+			round1_high[i][j] = (double)image_data[i][j];
+		}
+	}
+	for(int i=0; i<height; i++){
+		horizontal_convolution(round1_low[i],width,low_pass_filter,7);
+		horizontal_convolution(round1_high[i],width,high_pass_filter,10);
+	}
+
+	for(int i =0; i<height; i++){
+		for(int j = 0; j<width; j++){
+			round2_low[i][j]=round1_low[i][j];
+			round2_high[i][j]=round2_high[i][j];
+		}
+	}
+
+	vertical_convolution(round1_low,height,width,low_pass_filter,7);
+	vertical_convolution(round2_low,height,width,high_pass_filter,10);
+	vertical_convolution(round1_high,height,width,high_pass_filter,10);
+	vertical_convolution(round2_high,height,width,low_pass_filter,7);
+	
+	for(int i=0; i<height; i++){
+		for(int j=0; j<height; j++){
+			image_data[i][j]=(unsigned char)0;
+		}
+	}
+
+	for (int i = 0; i<height/2; i++){
+		for(int j = 0; j<width/2; j++){
+			image_data[i][j] = (unsigned char) round1_low[i*2][j*2];
+		}
+		for(int j =width/2; j<width/2+width/2; j++){
+			image_data[i][j] = (unsigned char)round2_low[i*2][(j-width/2)*2];
+		}
+	}
+
+	for (int i = height/2; i<height/2+height/2; i++){
+		for(int j = 0; j<width/2; j++){
+			image_data[i][j] = (unsigned char) round1_high[(i-height/2)*2][j*2];
+		}
+		for(int j =width/2; j<width/2+width/2; j++){
+			image_data[i][j] = (unsigned char)round2_low[(i-height/2)*2][(j-width/2)*2];
+		}
+	}
+
+	return;
 }
 
 void reconstruct(unsigned char** image_data, int height, int width, 
 	       	unsigned char* image_header_data, int bitmap_offset,
 		std::string filename){
-	std::ofstream output_file;
+
 	filename+=".bmp";
+	std::ofstream output_file;
+
 	output_file.open(filename.c_str(), std::ofstream::out | std::ofstream::binary);
 	output_file.write(reinterpret_cast<const char*>(image_header_data), bitmap_offset);
 	
@@ -152,8 +262,49 @@ int main(int argc, char * arg[])
  */
 
 //	reconstruct((imageData),height,width*3,image_header_data,bitmap_offset,filename);
+	
+	int decomp_height = height;
+	int decomp_width = width;
+	int decomposition_loops = 2;
+
+	for(int i=0; i<decomposition_loops; i++){
+
+	subband_decomp(blue_data,decomp_height,decomp_width);
+	subband_decomp(green_data,decomp_height,decomp_width);
+	subband_decomp(red_data,decomp_height,decomp_width);
+	
+	decomp_height/=2;
+	decomp_width/=2;
+
+	}
+
+	
+	for (int i = 0; i<height; i++){
+		for(int j = 0; j<width*3; j+=3){
+			imageData[i][j]=blue_data[i][j/3];
+		}
+		for(int j = 1; j<width*3; j+=3){
+			imageData[i][j]=green_data[i][j/3];
+		}
+		for(int j=2;j<width*3; j+=3){
+			imageData[i][j]=red_data[i][j/3];
+		}
+	}
+
+	reconstruct(imageData,height,width*3,image_header_data,bitmap_offset,"Testout.bmp");
 
 
+/*
+ *	So now imageData has the Subband Decomposition of the oringal image (decomposed twice).
+ *	the compression portion hasn't happened yet, that involves choosing the threshold and such.
+ *
+ *
+ *
+ *
+ *
+ *=================================================================================
+ */
+	
    return 1;
 }
 
