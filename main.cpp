@@ -3,6 +3,27 @@
 #include <stdlib.h>
 #include <cmath>
 
+void subband_decomp(){
+
+}
+
+void reconstruct(unsigned char** image_data, int height, int width, 
+	       	unsigned char* image_header_data, int bitmap_offset,
+		std::string filename){
+	std::ofstream output_file;
+	filename+=".bmp";
+	output_file.open(filename.c_str(), std::ofstream::out | std::ofstream::binary);
+	output_file.write(reinterpret_cast<const char*>(image_header_data), bitmap_offset);
+	
+
+	for (int i = 0; i< height; i++){
+		output_file.write(reinterpret_cast<const char*>(image_data[i]),width);
+	}
+	output_file.close();
+	return;
+}
+
+
 int main(int argc, char * arg[])
 
 {	
@@ -62,17 +83,24 @@ int main(int argc, char * arg[])
 		std::cout<<"Image is not a 24-bit bitmap file. Please submit a properly formatted file."<<std::endl;
 		return 1;
 	}
-	unsigned char image_header_data[bitmap_offset];
-	unsigned char imageData[height][width*3];
-	unsigned char blue_data[height][width];
-	unsigned char green_data[height][width];
-	unsigned char red_data[height][width];
+	unsigned char* image_header_data= new unsigned char[bitmap_offset];
+	unsigned char** imageData=new unsigned char*[height];
+	unsigned char** blue_data=new unsigned char*[height];
+	unsigned char** green_data=new unsigned char*[height];
+	unsigned char** red_data=new unsigned char*[height];
+
+	for (int i = 0; i<height; i++){
+		imageData[i] = new unsigned char[width*3];
+		blue_data[i] = new unsigned char[width];
+		green_data[i] = new unsigned char[width];
+		red_data[i] = new unsigned char[width];
+	}	
 
 	image_file.seekg(0, std::ifstream::beg);
 	image_file.read(reinterpret_cast<char*>(image_header_data),bitmap_offset);
 
 	for (int i=0; i<height; i++){
-		image_file.read(reinterpret_cast<char*>(imageData[i]),width);
+		image_file.read(reinterpret_cast<char*>(imageData[i]),width*3);
 	}
 
 //	for (int i=0; i<height; i++){
@@ -119,9 +147,11 @@ int main(int argc, char * arg[])
  image_header_data <- the original image header
  *
  *
- *
+ *                            Subband Decomposition
  *========================================================================
  */
+
+//	reconstruct((imageData),height,width*3,image_header_data,bitmap_offset,filename);
 
 
    return 1;
