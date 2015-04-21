@@ -62,13 +62,14 @@ int main(int argc, char * arg[])
 		std::cout<<"Image is not a 24-bit bitmap file. Please submit a properly formatted file."<<std::endl;
 		return 1;
 	}
-
+	unsigned char image_header_data[bitmap_offset];
 	unsigned char imageData[height][width*3];
 	unsigned char blue_data[height][width];
 	unsigned char green_data[height][width];
 	unsigned char red_data[height][width];
 
-	image_file.seekg(bitmap_offset, std::ifstream::beg);
+	image_file.seekg(0, std::ifstream::beg);
+	image_file.read(reinterpret_cast<char*>(image_header_data),bitmap_offset);
 
 	for (int i=0; i<height; i++){
 		image_file.read(reinterpret_cast<char*>(imageData[i]),width);
@@ -114,6 +115,8 @@ int main(int argc, char * arg[])
 
  height <- original image height.
  width <- original image width.
+ 
+ image_header_data <- the original image header
  *
  *
  *
