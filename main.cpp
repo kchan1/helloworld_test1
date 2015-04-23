@@ -54,7 +54,7 @@ void vertical_convolution(double** &image, int height, int width,  double* filte
 void subband_decomp(unsigned char** &image_data, int height, int width){
 
 	double low_pass_filter[7] = {.1,0,-.3,.2,.7,.6,.2};
-	double high_pass_filter[10] = {-.2,.6,-.7,.2,.3,0,-.1,0,0,0};
+	double high_pass_filter[7] = {-.2,.6,-.7,.2,.3,0,-.1};
 	double** round1_low = new double*[height];
 	double** round1_high = new double*[height];
 	double** round2_low = new double*[height];
@@ -73,26 +73,25 @@ void subband_decomp(unsigned char** &image_data, int height, int width){
 	}
 	for(int i=0; i<height; i++){
 		horizontal_convolution(round1_low[i],width,low_pass_filter,7);
-		horizontal_convolution(round1_high[i],width,high_pass_filter,10);
+		horizontal_convolution(round1_high[i],width,high_pass_filter,7);
 	}
 
 	for(int i =0; i<height; i++){
 		for(int j = 0; j<width; j++){
 			round2_low[i][j]=round1_low[i][j];
-			round2_high[i][j]=round2_high[i][j];
+			round2_high[i][j]=round1_high[i][j];
 		}
 	}
 
 	vertical_convolution(round1_low,height,width,low_pass_filter,7);
-	vertical_convolution(round2_low,height,width,high_pass_filter,10);
-	vertical_convolution(round1_high,height,width,high_pass_filter,10);
+	vertical_convolution(round2_low,height,width,high_pass_filter,7);
+	vertical_convolution(round1_high,height,width,high_pass_filter,7);
 	vertical_convolution(round2_high,height,width,low_pass_filter,7);
 	
-	for(int i=0; i<height; i++){
-		for(int j=0; j<height; j++){
-			image_data[i][j]=(unsigned char)0;
-		}
-	}
+	//for (int i = 0; i <10 ; i++){
+	//	std::cout<<round2_high[i][1]<<" ";
+	//}
+	//std::cout<<std::endl;
 
 	for (int i = 0; i<height/2; i++){
 		for(int j = 0; j<width/2; j++){
@@ -108,7 +107,7 @@ void subband_decomp(unsigned char** &image_data, int height, int width){
 			image_data[i][j] = (unsigned char) round1_high[(i-height/2)*2][j*2];
 		}
 		for(int j =width/2; j<width/2+width/2; j++){
-			image_data[i][j] = (unsigned char)round2_low[(i-height/2)*2][(j-width/2)*2];
+			image_data[i][j] = (unsigned char)round2_high[(i-height/2)*2][(j-width/2)*2];
 		}
 	}
 
@@ -265,7 +264,7 @@ int main(int argc, char * arg[])
 	
 	int decomp_height = height;
 	int decomp_width = width;
-	int decomposition_loops = 2;
+	int decomposition_loops = 3;
 
 	for(int i=0; i<decomposition_loops; i++){
 
