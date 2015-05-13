@@ -1,5 +1,5 @@
 #include <iostream>
-
+#include <cmath>
 class UCharList
 {
 public:
@@ -107,10 +107,39 @@ private:
   }
 };
 
-//helper function for determining if coeff is zerotree root
-bool isZeroTree(int width,int height,int x, int y,bool**zerotree)
+//helper function for determining if coeff is positive, negative, zerotree root, or isolated zero
+char isPNTZ(unsigned char**image,int width,int height,int depth, unsigned char threshold,int x, int y)
 {
-  return true;
+  //if the image is below the threshold, it may be a zerotree
+  if((char)image[x][y] < threshold)
+  {
+    int layer = depth;
+    while(x > width>>layer)
+      layer++;
+    //if this is the highest level, there are three children to check
+    if(x < width>>depth && y < height>>depth)
+    {
+      //if(isPNTZ(image,width,height,depth,threshold, (int)(x/(double)width)))
+      
+    }
+    //if this is the lowest level, there are no children to check
+    else if(x > width/2 && y > height/2)
+    {
+      return 'Z';
+    }
+    //otherwise there are 4 children to check
+    else
+    {
+    }
+  }
+  else if((char)image[x][y] >= threshold)
+  {
+    return 'P';
+  }
+  else if((char)image[x][y] >= threshold)
+  {
+    return 'n';
+  }
 }
 
 //as described in the algorithm

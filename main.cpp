@@ -116,19 +116,19 @@ void subband_decomp(unsigned char** &image_data, int height, int width){
 			image_data[i][j] = (unsigned char) round1_low[i*2][j*2];
 		}
 		//fill the right quarter
-		for(int j =width/2+1; j<width; j++){
+		for(int j =width/2; j<width; j++){
 			image_data[i][j] = (unsigned char)round2_low[i*2][(j-width/2)*2];
 		}
 	}
 
 	//fill the bottom half of the image
-	for (int i = height/2; i<height/2+height/2; i++){
+	for (int i = height/2; i<height; i++){
 	        //fill the left quarter
 		for(int j = 0; j<width/2; j++){
 			image_data[i][j] = (unsigned char) round1_high[(i-height/2)*2][j*2];
 		}
                 //fill the right quarter
-		for(int j =width/2+1; j<width; j++){
+		for(int j =width/2; j<width; j++){
 			image_data[i][j] = (unsigned char)round2_high[(i-height/2)*2][(j-width/2)*2];
 		}
 	}
@@ -349,7 +349,7 @@ int main(int argc, char * arg[])
  */
 	//clean up memory
 	delete image_header_data;
-	for(int i=0;i<height;)
+	for(int i=0;i<height;i++)
 	{
 	  delete imageData[i];
 	  delete blue_data[i];
