@@ -117,7 +117,7 @@ void subband_decomp(unsigned char** &image_data, int height, int width){
 		}
 		//fill the right quarter
 		for(int j =width/2; j<width; j++){
-			image_data[i][j] = (unsigned char)round2_low[i*2][(j-width/2)*2];
+			image_data[i][j] = (unsigned char)round2_high[i*2][(j-width/2)*2];
 		}
 	}
 
@@ -125,11 +125,11 @@ void subband_decomp(unsigned char** &image_data, int height, int width){
 	for (int i = height/2; i<height; i++){
 	        //fill the left quarter
 		for(int j = 0; j<width/2; j++){
-			image_data[i][j] = (unsigned char) round1_high[(i-height/2)*2][j*2];
+			image_data[i][j] = (unsigned char) round2_low[(i-height/2)*2][j*2];
 		}
                 //fill the right quarter
 		for(int j =width/2; j<width; j++){
-			image_data[i][j] = (unsigned char)round2_high[(i-height/2)*2][(j-width/2)*2];
+			image_data[i][j] = (unsigned char)round1_high[(i-height/2)*2][(j-width/2)*2];
 		}
 	}
 
