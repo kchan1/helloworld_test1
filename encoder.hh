@@ -1,5 +1,53 @@
+#ifndef _ENCODER_HH_
+#define _ENCODER_HH_
 #include <iostream>
 #include <cmath>
+class IntQueue
+{
+public:
+  unsigned int cap;
+  unsigned int size;
+  unsigned int start;
+  unsigned int end;
+  int*q;
+  IntQueue(uint capacity)
+  {
+    q = (int*)(calloc(capacity,sizeof(int)));
+    cap = capacity;
+    size = 0;
+    start = 0;
+    end = 0;
+  }
+  ~IntQueue()
+  {
+    free(q);
+  }
+  bool NQ(int i)
+  {
+    if( size != cap )
+    {
+      size++;
+      //std::cout<<"\tNQ:" << i <<"|" << size << "/" << cap <<  "\n";
+      q[end] = i;
+      end = (end+1)%cap;
+      return true;
+    }
+    return false;
+  }
+  int DQ()
+  {
+    if(size != 0)
+    {
+      int ret;
+      size--;
+      ret = q[start];
+      start = (start+1)%cap;
+      //std::cout<<"\tDQ:" << ret <<"|" << size<< "/" << cap << "\n";
+      return ret;
+    }
+    return -1;
+  }
+};
 class UCharList
 {
 public:
@@ -138,7 +186,7 @@ char isPNTZ(unsigned char**image,int width,int height,int depth, unsigned char t
   }
   else if((char)image[x][y] >= threshold)
   {
-    return 'n';
+    return 'N';
   }
 }
 
@@ -147,8 +195,6 @@ void dominant_pass(unsigned char**image,int origin_x,int origin_y,int width,int 
 {
   int i,j;
   //if we are splitting px in half the half goes to 2nd half
-  //int ifoddwidth;
-  //int ifoddheight;
   if(level!=depth)
   {
     //actually do the coding
@@ -177,7 +223,8 @@ void dominant_pass(unsigned char**image,int origin_x,int origin_y,int width,int 
 		  width/2,
 		  height/2,
 		  depth,threshold,level+1,coded,sub_list);
-    //recurse also on the LH, HL, and HH but they don't recurse themselves (level set to depth)
+    //TODO THIS ORDER IS NOT CLEAR
+     //recurse also on the LH, HL, and HH but they don't recurse themselves (level set to depth)
     //LH?
     dominant_pass(image,
 		  origin_x+width/2+width%2,
@@ -238,3 +285,4 @@ int encode(unsigned char**image,int width,int height,int depth,unsigned char min
     delete coded[i];
   delete coded;
 }
+#endif
