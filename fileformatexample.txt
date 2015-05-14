@@ -1,0 +1,10 @@
+int width, int height, 
+int depth_of_subbanding,
+int initial_threshold, 
+int threshold min,
+int length_of_blue_bistream_in_bytes,
+[blue bistream]
+int length_of_green_bitstream_in_bytes,
+[green bitstream]
+int length_of_red_bitstream_in_bytes,
+[red bitstream]
