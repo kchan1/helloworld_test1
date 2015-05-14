@@ -1,4 +1,4 @@
-int width, int height, 
+[original header]
 int depth_of_subbanding,
 int initial_threshold, 
 int threshold min,
