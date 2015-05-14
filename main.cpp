@@ -309,7 +309,7 @@ int main(int argc, char * arg[])
 	//for the number of loops (hardcoded 3) decompose the arrays
 	//each iteration creates the quarter-subarays for LL, LH, HL, HH
 	//the quarter subarray LL is then further decomposed for another loop
-	for(int i=0; i<decomposition_loops; i++){
+	for(int i=0; i<=decomposition_loops; i++){
 
 	subband_decomp(blue_data,decomp_height,decomp_width);
 	subband_decomp(green_data,decomp_height,decomp_width);
