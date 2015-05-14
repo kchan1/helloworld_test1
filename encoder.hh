@@ -190,14 +190,14 @@ void dominant_pass(unsigned char**image,int orgwidth,int orgheight,int depth, in
       for(j=0;j<newheight;j++)
       {
 	//for coded, T is part of a zerotree, C is coded, U is uncoded
-	//if the coefficient is either coded already or is part of a tree, skip
+	//if the coefficient is either coded already or is part of a zerotree, skip
 	if(coded[i][j]=='T'||coded[i][j]=='C')
 	  continue;
 	//get the state of this specific coefficient
 	read = isPNTZ(image,orgwidth,orgheight,depth,threshold,i,j);
 	//11 positive
 	//10 negative
-	//01 zerotree
+	//01 zerotree root
 	//00 isolated zero
 	//0 level 0 zero
 	switch(read)
@@ -301,15 +301,13 @@ void subordinate_pass(unsigned char**image,unsigned char threshold,IntQueue*sub_
 //   min_threshold: the threshold to stop at
 //   max: the maximum coefficient in image
 //find the max coeff beforehand!
-int encode(unsigned char**image,int width,int height,int depth,unsigned char min_threshold, unsigned char max, unsigned char**encode_out,std::ofstream*file_out)
+int encode(unsigned char**image,int width,int height,int depth,unsigned char min_threshold, unsigned char max, unsigned char**encode_out,BitWriter*bitstream)
 {
   unsigned char threshold = max;
   //this holds the coding states of all the coefficients
   unsigned char**coded;
   //this is used to keep track of which coefficients need a subordinate pass
   IntQueue*sub_list;
-  //bitstream is need to write individual bits
-  BitWriter*bitstream;
   int i,j;
   //initialization
   sub_list = new IntQueue(width*height);
@@ -320,7 +318,6 @@ int encode(unsigned char**image,int width,int height,int depth,unsigned char min
     for(j=0;j<width;j++)
       coded[i][j]='U';
   }
-  bitstream = new BitWriter(file_out);
   //do a dom and sub pass
   //we're going to be doing this at least once
   do
@@ -330,9 +327,10 @@ int encode(unsigned char**image,int width,int height,int depth,unsigned char min
     threshold/=2;
   }
   while(threshold>min_threshold);
-  
   for(i=0;i<width;i++)
     delete coded[i];
   delete coded;
+  delete sub_list;
+  delete bitstream;
 }
 #endif
