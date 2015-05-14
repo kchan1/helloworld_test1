@@ -2,6 +2,38 @@
 #define _ENCODER_HH_
 #include <iostream>
 #include <cmath>
+class BitWriter
+{
+public:
+  BitWriter(std::ofstream*towrite)
+  {
+    out=towrite;
+    buffer = 0;
+    bitnum = 0;
+  }
+  void write(unsigned char bit)
+  {
+    //add the new bit to the buffer
+    buffer = buffer | (bit&1)<<(7-bitnum++);
+    //we only write to the stream when 8 bits have been written
+    if(bitnum==8)
+    {
+      *out<<buffer;
+      bitnum=0;
+    }
+  }
+  //finish writing the buffer if it is half done;if it is already done, don't!
+  void endWrite()
+  {
+    if(bitnum>0)
+      *out<<buffer;
+  }
+private:
+  std::ofstream*out;
+  unsigned char buffer;
+  int bitnum;
+};
+
 class IntQueue
 {
 public:
@@ -48,113 +80,50 @@ public:
     return -1;
   }
 };
-class UCharList
+//helpder function for marking entire trees as zerotrees
+void markTree(int width, int height, int depth,int x,int y,unsigned char**coded)
 {
-public:
-  int size;
-  int capacity;
-  unsigned char*list;
-  UCharList(int capcity)
+  //quickly determind what layer we are at
+  int layer = depth;
+  while(x > width>>layer)
+    layer++;
+  //first mark this node
+  coded[x][y]='T';
+  //if this is the deepest level, there are three children to mark
+  if(x < width>>depth && y < height>>depth)
   {
-    list = new unsigned char[capacity];
+    markTree(width,height,depth,
+	     x+(width>>depth),y,
+	     coded);
+    markTree(width,height,depth,
+	     x,y+(height>>depth),
+	     coded);
+    markTree(width,height,depth,
+	     x+(width>>depth),y+(height>>depth),
+	     coded);
   }
-  ~UCharList()
+  //if this is the lowest level, there are no children to mark
+  else if(x > width/2 && y > height/2)
   {
-    delete list;
+    return;
   }
-  int find(unsigned char uc)
+  //otherwise there are 4 children to mark
+  else
   {
-    int begin,end;
-    for(begin=0,end=size-1;begin<=end;)
-    {
-      //3 elems left
-      if(end-begin==0)
-      {
-        if(list[end]==uc)
-	  return end;
-	else
-	  return -1;
-      }
-      //2 elems left
-      else if(end-begin==1)
-      {
-	if(list[begin]==uc)
-	  return begin;
-	else if(list[end]==uc)
-	  return end;
-	else
-	  return -1;
-      }
-      //if is in bottom half
-      else if(uc < list[begin+(end-begin)/2])
-      {
-	end = begin+(end-begin)/2;
-      }
-      //if is in top half
-      else if(uc > list[begin+(end-begin)/2])
-      {
-	begin = begin+(end-begin)/2;
-      }
-      //if found
-      else
-	return begin+(end-begin)/2;
-    }
-    return -1;
+    markTree(width,height,depth,
+	     x*2,y*2,
+	     coded);
+    markTree(width,height,depth,
+	     x*2+1,y*2,
+	     coded);
+    markTree(width,height,depth,
+	     x*2,y*2+1,
+	     coded);
+    markTree(width,height,depth,
+	     x*2+1,y*2+1,
+	     coded);    
   }
-  int add(unsigned char uc)
-  {
-    if(size==capacity)
-      return -1;
-    int i;
-    for(i=0;i<size;i++)
-    {
-      if(list[i]==uc)
-	return i;
-      else if(list[i]>uc)
-	break;
-    }
-    shiftDown(i);
-    list[i]=uc;
-    size++;
-  }
-  unsigned char remove(int index)
-  {
-    if(index>=size || index <0 || size==0)
-      return 0;
-    unsigned char ret = list[index];
-    shiftUp(index);
-    size--;
-    return ret;
-  }
-private:
-  //shift down for addition into the array
-  void shiftDown(int index)
-  {
-    if(size==capacity)
-      return;
-    int i;
-    for(i=size;i>index;i++)
-    {
-      list[i]=list[i-1];
-    }
-    size++;
-  }
-  //shift up to delete the elem at index
-  void shiftUp(int index)
-  {
-    if(size==0||index>=size)
-      return;
-    int i;
-    for(i=index;i<size;i++)
-    {
-      if(i!=capacity-1)
-	list[i]=list[i+1];
-      else
-	list[i]=0;
-    }
-  }
-};
-
+}
 //helper function for determining if coeff is positive, negative, zerotree root, or isolated zero
 char isPNTZ(unsigned char**image,int width,int height,int depth, unsigned char threshold,int x, int y)
 {
@@ -164,10 +133,18 @@ char isPNTZ(unsigned char**image,int width,int height,int depth, unsigned char t
     int layer = depth;
     while(x > width>>layer)
       layer++;
-    //if this is the highest level, there are three children to check
+    //if this is the deepest level, there are three children to check
     if(x < width>>depth && y < height>>depth)
     {
-      //if(isPNTZ(image,width,height,depth,threshold, (int)(x/(double)width)))
+      if(isPNTZ(image,width,height,depth,threshold, 
+        x+(width>>depth),y)=='T' &&
+	isPNTZ(image,width,height,depth,threshold, 
+        x,y+(height>>depth))=='T' &&
+	isPNTZ(image,width,height,depth,threshold, 
+        x+(width>>depth),y+(height>>depth))=='T')
+	return 'T';
+      else
+	return 'Z';
       
     }
     //if this is the lowest level, there are no children to check
@@ -178,79 +155,142 @@ char isPNTZ(unsigned char**image,int width,int height,int depth, unsigned char t
     //otherwise there are 4 children to check
     else
     {
+      if(isPNTZ(image,width,height,depth,threshold, 
+	x*2,y*2)=='T' &&
+	isPNTZ(image,width,height,depth,threshold, 
+	x*2+1,y*2)=='T' &&
+	isPNTZ(image,width,height,depth,threshold, 
+        x*2,y*2+1)=='T' &&
+	isPNTZ(image,width,height,depth,threshold, 
+        x*2+1,y*2+1)=='T')
+	return 'T';
+      else
+	return 'Z';
     }
   }
   else if((char)image[x][y] >= threshold)
-  {
     return 'P';
-  }
   else if((char)image[x][y] >= threshold)
-  {
     return 'N';
-  }
+  else
+    return '?';
 }
 
 //as described in the algorithm
-void dominant_pass(unsigned char**image,int origin_x,int origin_y,int width,int height,int depth, unsigned char threshold,int level, unsigned char**coded,UCharList*sub_list)
+void dominant_pass(unsigned char**image,int orgwidth,int orgheight,int depth, int newwidth,int newheight,int origin_x,int origin_y,unsigned char threshold,int level, unsigned char**coded,IntQueue*sub_list,unsigned char**recon_coeff,BitWriter*bitstream)
 {
   int i,j;
-  //if we are splitting px in half the half goes to 2nd half
+  char read;
+  //if we are not at the roots of the zerotree forest
   if(level!=depth)
   {
     //actually do the coding
-    for(i=0;i<width;i++)
+    for(i=0;i<newwidth;i++)
     {
-      for(j=0;j<height;j++)
+      for(j=0;j<newheight;j++)
       {
-	if(image[i][j]>=threshold)
+	//for coded, T is part of a zerotree, C is coded, U is uncoded
+	//if the coefficient is either coded already or is part of a tree, skip
+	if(coded[i][j]=='T'||coded[i][j]=='C')
+	  continue;
+	//get the state of this specific coefficient
+	read = isPNTZ(image,orgwidth,orgheight,depth,threshold,i,j);
+	//11 positive
+	//10 negative
+	//01 zerotree
+	//00 isolated zero
+	//0 level 0 zero
+	switch(read)
 	{
-	  //write 1
+	case 'P':
+	  bitstream->write(1);
+	  bitstream->write(1);
+	  coded[i][j]='C';
+	  sub_list->NQ((i&0xFFFF)<<16 | (j&0xFFFF));
+	  recon_coeff[i][j]=threshold+threshold/2;
+	  break;
+	case 'N':
+	  bitstream->write(1);
+	  bitstream->write(0);
+	  coded[i][j]='C';
+	  sub_list->NQ((i&0xFFFF)<<16 | (j&0xFFFF));
+	  recon_coeff[i][j]=threshold+threshold/2;
+	  break;
+	case 'T':
+	  bitstream->write(0);
+	  bitstream->write(1);
+	  markTree(orgwidth,orgheight,depth,i,j,coded);
+	  break;
+	case 'Z':
+	  bitstream->write(0);
+	  //only write that second zero if we aren't on the lowest level
+	  if(i>orgwidth/2 || j>orgheight/2)
+	    bitstream->write(0);
+	  coded[i][j] = 'Z';
+	  break;
+	default:
+	  std::cout<<"ERROR! UNKNOWN COEFFICIENT STATE ("<<i<<","<<j<<")\n";
+	  break;
 	}
-        else
-	{  
-          //write 0
-	}
-	coded[i][j]=true;
       }
     }
   }
   else
   {
     //recurse on the next level
-    dominant_pass(image,
+    dominant_pass(image,orgwidth,orgheight,depth,
+		  newwidth/2,
+		  newheight/2,
 		  origin_x,
 		  origin_y,
-		  width/2,
-		  height/2,
-		  depth,threshold,level+1,coded,sub_list);
-    //TODO THIS ORDER IS NOT CLEAR
-     //recurse also on the LH, HL, and HH but they don't recurse themselves (level set to depth)
+		  threshold,level+1,coded,sub_list,recon_coeff,bitstream);
+    //TODO THIS ORDER IS NOT CLEAR?! I just do the +width first
+    //recurse also on the LH, HL, and HH but they don't recurse themselves
     //LH?
-    dominant_pass(image,
-		  origin_x+width/2+width%2,
+    dominant_pass(image,orgwidth,orgheight,depth,
+		  newwidth/2,
+		  newheight/2,
+		  origin_x+newwidth/2,
 		  origin_y,
-		  width/2,
-		  height/2,
-		  depth,threshold,depth,coded,sub_list);
+		  threshold,depth,coded,sub_list,recon_coeff,bitstream);
     //HL?
-    dominant_pass(image,
+    dominant_pass(image,orgwidth,orgheight,depth,
+		  newwidth/2,
+		  newheight/2,
 		  origin_x,
-		  origin_y+height/2+height%2,
-		  width/2,height/2,
-		  depth,threshold,depth,coded,sub_list);
+		  origin_y+newheight/2,
+		  threshold,depth,coded,sub_list,recon_coeff,bitstream);
     //HH
-    dominant_pass(image,
-		  origin_x+width/2+width%2,
-		  origin_y+height/2+height%2,
-		  width/2,
-		  height/2,
-		  depth,threshold,depth,coded,sub_list);
-  }
+    dominant_pass(image,orgwidth,orgheight,depth,
+		  newwidth/2,
+		  newheight/2,
+		  origin_x+newwidth/2,
+		  origin_y+newheight/2,
+		  threshold,depth,coded,sub_list,recon_coeff,bitstream);
+  }//end if level
 }
-
-void subordinate_pass(unsigned char**image,int origin_x,int origin_y,int width,int height,int depth, unsigned char threshold,int level, unsigned char**coded,UCharList*sub_list)
+void subordinate_pass(unsigned char**image,unsigned char threshold,IntQueue*sub_list,unsigned char**recon_coeff,BitWriter*bitstream)
 {
-  return;
+  int coord,x,y;
+  //empty out the sub_list
+  while(sub_list->size>0)
+  {
+    //separate x and y from the compact form used in the list
+    coord = sub_list->DQ();
+    x=coord>>16&0xFFFF;
+    y=coord&0xFFFF;
+    //as in the alcorithm
+    if(image[x][y]>recon_coeff[x][y])
+    {
+      bitstream->write(1);
+      recon_coeff[x][y]+=threshold/2;
+    }
+    else
+    {
+      bitstream->write(0);
+      recon_coeff[x][y]-=threshold/2;
+    }
+  }
 }
 
 //encode an image of coefficients
@@ -264,19 +304,29 @@ void subordinate_pass(unsigned char**image,int origin_x,int origin_y,int width,i
 int encode(unsigned char**image,int width,int height,int depth,unsigned char min_threshold, unsigned char max, unsigned char**encode_out,std::ofstream*file_out)
 {
   unsigned char threshold = max;
+  //this holds the coding states of all the coefficients
   unsigned char**coded;
-  UCharList*sub_list;
-  int i;
-  sub_list = new UCharList(width*height);
+  //this is used to keep track of which coefficients need a subordinate pass
+  IntQueue*sub_list;
+  //bitstream is need to write individual bits
+  BitWriter*bitstream;
+  int i,j;
+  //initialization
+  sub_list = new IntQueue(width*height);
   coded = new unsigned char*[height];
-  for(i=0;i<width;i++)
+  for(i=0;i<height;i++)
+  {
     coded[i]=new unsigned char[width];
+    for(j=0;j<width;j++)
+      coded[i][j]='U';
+  }
+  bitstream = new BitWriter(file_out);
   //do a dom and sub pass
   //we're going to be doing this at least once
   do
   {
-    dominant_pass(image,0,0,width,height,depth,threshold,0,coded,sub_list);
-    subordinate_pass(image,0,0,width,height,depth,threshold,0,coded,sub_list);
+    dominant_pass(image,width,height,depth,width,height,0,0,threshold,0,coded,sub_list,encode_out,bitstream);
+    subordinate_pass(image,threshold,sub_list,encode_out,bitstream);
     threshold/=2;
   }
   while(threshold>min_threshold);
