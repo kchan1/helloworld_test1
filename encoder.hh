@@ -42,7 +42,7 @@ public:
   unsigned int start;
   unsigned int end;
   int*q;
-  IntQueue(uint capacity)
+  IntQueue(unsigned int capacity)
   {
     q = (int*)(calloc(capacity,sizeof(int)));
     cap = capacity;
@@ -125,10 +125,10 @@ void markTree(int width, int height, int depth,int x,int y,unsigned char**coded)
   }
 }
 //helper function for determining if coeff is positive, negative, zerotree root, or isolated zero
-char isPNTZ(unsigned char**image,int width,int height,int depth, unsigned char threshold,int x, int y)
+char isPNTZ(double**image,int width,int height,int depth, unsigned char threshold,int x, int y)
 {
   //if the image is below the threshold, it may be a zerotree
-  if((char)image[x][y] < threshold)
+  if(image[x][y] < threshold)
   {
     int layer = depth;
     while(x > width>>layer)
@@ -145,7 +145,6 @@ char isPNTZ(unsigned char**image,int width,int height,int depth, unsigned char t
 	return 'T';
       else
 	return 'Z';
-      
     }
     //if this is the lowest level, there are no children to check
     else if(x > width/2 && y > height/2)
@@ -168,16 +167,16 @@ char isPNTZ(unsigned char**image,int width,int height,int depth, unsigned char t
 	return 'Z';
     }
   }
-  else if((char)image[x][y] >= threshold)
+  else if(image[x][y] >= threshold)
     return 'P';
-  else if((char)image[x][y] >= threshold)
+  else if(image[x][y] >= threshold)
     return 'N';
   else
     return '?';
 }
 
 //as described in the algorithm
-void dominant_pass(unsigned char**image,int orgwidth,int orgheight,int depth, int newwidth,int newheight,int origin_x,int origin_y,unsigned char threshold,int level, unsigned char**coded,IntQueue*sub_list,unsigned char**recon_coeff,BitWriter*bitstream)
+void dominant_pass(double**image,int orgwidth,int orgheight,int depth, int newwidth,int newheight,int origin_x,int origin_y,int threshold,int level, unsigned char**coded,IntQueue*sub_list,double**recon_coeff,BitWriter*bitstream)
 {
   int i,j;
   char read;
@@ -269,7 +268,7 @@ void dominant_pass(unsigned char**image,int orgwidth,int orgheight,int depth, in
 		  threshold,depth,coded,sub_list,recon_coeff,bitstream);
   }//end if level
 }
-void subordinate_pass(unsigned char**image,unsigned char threshold,IntQueue*sub_list,unsigned char**recon_coeff,BitWriter*bitstream)
+void subordinate_pass(double**image,int threshold,IntQueue*sub_list,double**recon_coeff,BitWriter*bitstream)
 {
   int coord,x,y;
   //empty out the sub_list
@@ -279,7 +278,7 @@ void subordinate_pass(unsigned char**image,unsigned char threshold,IntQueue*sub_
     coord = sub_list->DQ();
     x=coord>>16&0xFFFF;
     y=coord&0xFFFF;
-    //as in the alcorithm
+    //as in the algorithm
     if(image[x][y]>recon_coeff[x][y])
     {
       bitstream->write(1);
@@ -301,35 +300,48 @@ void subordinate_pass(unsigned char**image,unsigned char threshold,IntQueue*sub_
 //   min_threshold: the threshold to stop at
 //   max: the maximum coefficient in image
 //find the max coeff beforehand!
-int encode(unsigned char**image,int width,int height,int depth,unsigned char min_threshold, unsigned char max, unsigned char**encode_out,BitWriter*bitstream)
+int encode(double**image,int width,int height,int depth,double min_threshold,double max,std::ofstream*file_out)
 {
-  unsigned char threshold = max;
+  int threshold = max;
   //this holds the coding states of all the coefficients
   unsigned char**coded;
+  //this colds all the reconstructed coefficients
+  double**recon_coeff;
   //this is used to keep track of which coefficients need a subordinate pass
   IntQueue*sub_list;
+  //for writing individual bits
+  BitWriter*bitstream;
   int i,j;
   //initialization
   sub_list = new IntQueue(width*height);
   coded = new unsigned char*[height];
+  recon_coeff = new double*[height];
+  bitstream = new BitWriter(file_out);
   for(i=0;i<height;i++)
   {
     coded[i]=new unsigned char[width];
+    recon_coeff[i]= new double[width];
     for(j=0;j<width;j++)
+    {
       coded[i][j]='U';
+    }
   }
   //do a dom and sub pass
   //we're going to be doing this at least once
   do
   {
-    dominant_pass(image,width,height,depth,width,height,0,0,threshold,0,coded,sub_list,encode_out,bitstream);
-    subordinate_pass(image,threshold,sub_list,encode_out,bitstream);
+    dominant_pass(image,width,height,depth,width,height,0,0,threshold,0,coded,sub_list,recon_coeff,bitstream);
+    subordinate_pass(image,threshold,sub_list,recon_coeff,bitstream);
     threshold/=2;
   }
   while(threshold>min_threshold);
   for(i=0;i<width;i++)
+  {
     delete coded[i];
+    delete recon_coeff[i];
+  }
   delete coded;
+  delete recon_coeff;
   delete sub_list;
   delete bitstream;
 }
