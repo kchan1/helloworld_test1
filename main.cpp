@@ -205,9 +205,40 @@ void subband_recomp(double** &image_data, int height, int width){
 	for (int i=0; i<height; i++){
 		for(int j=0; j<width; j++){
 			image_data[i][j] = round1_low[i][j]+round1_high[i][j];
-			image_data[i][j]*=.80;
+			image_data[i][j]*=.85;
 		}
 	}
+
+}
+
+void prepare(double** &image_data, int height, int width){
+	
+	for (int i = 0; i<height; i++){
+		for(int j=0; j<height; j++){
+			image_data[i][j]=(int)image_data[i][j];
+		}
+	}
+
+	int max = 0;
+	for (int i = 0; i<height; i++){
+		for(int j=0; j<height; j++){
+			image_data[i][j]=(int)(image_data[i][j]/20)*20;
+			image_data[i][j]=image_data[i][j]/20;
+			if (image_data[i][j] < -126){
+				image_data[i][j] = -126;
+			}
+			if (image_data[i][j] > 127){
+				image_data[i][j]= 127;
+			}
+			if (abs(image_data[i][j]) > max){
+				max = abs(image_data[i][j]);
+			}
+			image_data[i][j]*=20;
+			//std::cout<<image_data[i][j]<<" ";
+		}
+	}
+	//std::cout<<max<<std::endl;
+	
 
 }
 
@@ -228,6 +259,119 @@ void reconstruct(unsigned char** image_data, int height, int width,
 	}
 	output_file.close();
 	return;
+}
+
+void compress(double** &blue_data,double** &green_data, 
+	      double** &red_data, int height,int width,
+              unsigned char* &image_header_data, int &bitmap_offset,
+	      std::string filename , int decomposition_loops){
+
+	filename+=".205";
+	std::ofstream output_file;
+
+	output_file.open(filename.c_str(), std::ofstream::out | std::ofstream::binary);
+	output_file.write(reinterpret_cast<const char*>(image_header_data), bitmap_offset);
+	
+	unsigned char depth[1];
+	depth[0] = decomposition_loops;
+	unsigned char how_many[1];
+	how_many[0] = 0;
+	char value[1];
+	value[0] = 0;
+	double current;
+	int saved = 0;
+	
+	output_file.write(reinterpret_cast<const char*>(depth), 1);
+
+	current = blue_data[0][0];
+	how_many[0]=1;
+
+	for (int i = 0; i<height; i++){
+		for (int j = 0; j<height; j++){
+			if (blue_data[i][j]!=current){
+				value[0] = current;
+				output_file.write(reinterpret_cast<const char*>(how_many), 1);
+				output_file.write(reinterpret_cast<const char*>(value),1);
+				//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
+				saved+=how_many[0]-2;
+				current = blue_data[i][j];
+				how_many[0] = 1;
+				continue;		
+			}
+			if (how_many[0] == 255){
+				value[0] =  current;
+				output_file.write(reinterpret_cast<const char*>(how_many), 1);
+				output_file.write(reinterpret_cast<const char*>(value),1);
+				//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
+				saved+=how_many[0]-2;
+				how_many[0] = 0;
+				continue;
+			}
+			how_many[0]++;
+		}
+	}
+
+	current = green_data[0][0];
+	how_many[0]=1;
+
+	for (int i = 0; i<height; i++){
+		for (int j = 0; j<height; j++){
+			if (green_data[i][j]!=current){
+				value[0] = current;
+				output_file.write(reinterpret_cast<const char*>(how_many), 1);
+				output_file.write(reinterpret_cast<const char*>(value),1);
+				//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
+				saved+=how_many[0]-2;
+				current = green_data[i][j];
+				how_many[0] = 1;
+				continue;		
+			}
+			if (how_many[0] == 255){
+				value[0] = current;
+				output_file.write(reinterpret_cast<const char*>(how_many), 1);
+				output_file.write(reinterpret_cast<const char*>(value),1);
+				//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
+				saved+=how_many[0]-2;
+				how_many[0] = 0;
+				continue;
+			}
+			how_many[0]++;
+		}
+	}
+
+	current = red_data[0][0];
+	how_many[0]=1;
+
+	for (int i = 0; i<height; i++){
+		for (int j = 0; j<height; j++){
+			if (red_data[i][j]!=current){
+				value[0] = current;
+				output_file.write(reinterpret_cast<const char*>(how_many),1);
+				output_file.write(reinterpret_cast<const char*>(value),1);
+				//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
+				saved+=how_many[0]-2;
+				current = red_data[i][j];
+				how_many[0] = 1;
+				continue;		
+			}
+			if (how_many[0] == 255){
+				value[0] = current;
+				output_file.write(reinterpret_cast<const char*>(how_many), 1);
+				output_file.write(reinterpret_cast<const char*>(value),1);
+				//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
+				saved+=how_many[0]-2;
+				how_many[0] = 0;
+				continue;
+			}
+			how_many[0]++;
+		}
+	}
+
+	std::cout<<saved<<std::endl;
+	
+	output_file.close();
+	return;
+	
 }
 
 
@@ -252,6 +396,7 @@ int main(int argc, char * arg[])
 	//secondary buffers for interpretting the header
 	int bitmap_offset=0;
 	int width =0;
+	int image_width = 0;
 	int height =0;
 	int pixel_bits=0;
 	
@@ -277,6 +422,11 @@ int main(int argc, char * arg[])
 	for(int i=0; i<4; i++){
 		width+=(int)width_data[i]*pow(2,i*8);
 	}
+	//BMP pads their formats into 4 byte sizes.
+	width = (int)((3*8*width+31)/(32))*4;
+	image_width = width;
+	width /= 3;
+	
 	//read 4 bytes as the height
 	image_file.read(reinterpret_cast<char*>(height_data),4);
 	for(int i=0; i<4; i++){
@@ -305,6 +455,7 @@ int main(int argc, char * arg[])
 	//holds the raw input image data BUT also the raw input image output
 	unsigned char** imageData=new unsigned char*[height];
 	double** image_data = new double*[height];
+	char** image_data_char = new char*[height];
 	//holds the image data separated into colors
 	double** blue_data=new double*[height];
 	double** green_data=new double*[height];
@@ -312,8 +463,9 @@ int main(int argc, char * arg[])
 
 	//further initialize 2D arrays
 	for (int i = 0; i<height; i++){
-		imageData[i] = new unsigned char[width*3];
-		image_data[i] = new double[width*3];
+		imageData[i] = new unsigned char[image_width];
+		image_data[i] = new double[image_width];
+		image_data_char[i] = new char[image_width];
 		blue_data[i] = new double[width];
 		green_data[i] = new double[width];
 		red_data[i] = new double[width];
@@ -325,7 +477,7 @@ int main(int argc, char * arg[])
 
 	//read in the raw image data
 	for (int i=0; i<height; i++){
-		image_file.read(reinterpret_cast<char*>(imageData[i]),width*3);
+		image_file.read(reinterpret_cast<char*>(imageData[i]),image_width);
 	}
 
 //	for (int i=0; i<height; i++){
@@ -342,20 +494,20 @@ int main(int argc, char * arg[])
 	}*/
 
 	for(int i = 0; i<height; i++){
-		for(int j = 0; j<width*3; j++){
+		for(int j = 0; j<image_width; j++){
 			image_data[i][j]=imageData[i][j];
 		}
 	}
 
 	//separate imageData into the 3 colors
 	for (int i = 0; i<height; i++){
-		for(int j = 0; j<width*3; j+=3){
+		for(int j = 0; j<image_width; j+=3){
 			blue_data[i][j/3] = image_data[i][j];
 		}
-		for(int j = 1; j<width*3; j+=3){
+		for(int j = 1; j<image_width; j+=3){
 			green_data[i][j/3] = image_data[i][j];
 		}
-		for(int j=2;j<width*3; j+=3){
+		for(int j=2;j<image_width; j+=3){
 			red_data[i][j/3] = image_data[i][j];
 		}
 	}
@@ -413,19 +565,19 @@ int main(int argc, char * arg[])
 
 	//read the colors back into imageData
 	for (int i = 0; i<height; i++){
-		for(int j = 0; j<width*3; j+=3){
+		for(int j = 0; j<image_width; j+=3){
 			image_data[i][j]=blue_data[i][j/3];
 		}
-		for(int j = 1; j<width*3; j+=3){
+		for(int j = 1; j<image_width; j+=3){
 			image_data[i][j]=green_data[i][j/3];
 		}
-		for(int j=2;j<width*3; j+=3){
+		for(int j=2;j<image_width; j+=3){
 			image_data[i][j]=red_data[i][j/3];
 		}
 	}
 
 	for (int i=0; i<height; i++){
-		for(int j=0; j<width*3; j++){
+		for(int j=0; j<image_width; j++){
 			if (image_data[i][j]<0){
 				image_data[i][j]=0;
 			}
@@ -436,7 +588,7 @@ int main(int argc, char * arg[])
 	}
 
 	for(int i = 0; i<height; i++){
-		for(int j = 0; j<width*3; j++){
+		for(int j = 0; j<image_width; j++){
 			imageData[i][j]=image_data[i][j];
 		}
 	}
@@ -448,11 +600,41 @@ int main(int argc, char * arg[])
 		std::cout<<std::endl;
 	}*/
 	
-	reconstruct(imageData,height,width*3,image_header_data,bitmap_offset,"Testout.bmp");
+	reconstruct(imageData,height,image_width,image_header_data,bitmap_offset,"Testout.bmp");
 
-	/*int recomp_height= height;
+	
+	int recomp_height= height;
 	int recomp_width = width;
 	int num_decomps =1;
+
+	prepare(blue_data,height,width);
+	prepare(green_data,height,width);
+	prepare(red_data,height,width);
+
+	/*for(int i = 0; i<height; i++){
+		for(int j = 0; j<width; j++){
+			std::cout<<(int)blue_data[i][j]<<" ";
+		}
+	}*/
+
+	compress(blue_data,green_data,red_data,height,width,image_header_data,bitmap_offset,"compress",decomposition_loops);
+	
+	for (int i = 0; i<height; i++){
+		for(int j = 0; j<image_width; j+=3){
+			image_data_char[i][j]=blue_data[i][j/3];
+		}
+		for(int j = 1; j<image_width; j+=3){
+			image_data_char[i][j]=green_data[i][j/3];
+		}
+		for(int j=2;j<image_width; j+=3){
+			image_data_char[i][j]=red_data[i][j/3];
+		}
+		//for(int j=0; j<image_width; j++){
+		//	std::cout<<(int)image_data_char[i][j]<<" ";
+		//}
+	}
+
+	
 
 	for (int i = num_decomps; i>=1; i--){
 		recomp_height = height/pow(2,i-1);
@@ -463,19 +645,19 @@ int main(int argc, char * arg[])
 	}
 
 	for (int i = 0; i<height; i++){
-		for(int j = 0; j<width*3; j+=3){
+		for(int j = 0; j<image_width; j+=3){
 			image_data[i][j]=blue_data[i][j/3];
 		}
-		for(int j = 1; j<width*3; j+=3){
+		for(int j = 1; j<image_width; j+=3){
 			image_data[i][j]=green_data[i][j/3];
 		}
-		for(int j=2;j<width*3; j+=3){
+		for(int j=2;j<image_width; j+=3){
 			image_data[i][j]=red_data[i][j/3];
 		}
 	}
 
 	for (int i=0; i<height; i++){
-		for(int j=0; j<width*3; j++){
+		for(int j=0; j<image_width; j++){
 			if (image_data[i][j]<0){
 				image_data[i][j]=0;
 			}
@@ -486,14 +668,14 @@ int main(int argc, char * arg[])
 	}
 
 	for(int i = 0; i<height; i++){
-		for(int j = 0; j<width*3; j++){
+		for(int j = 0; j<image_width; j++){
 			imageData[i][j]=image_data[i][j];
 		}
 	}
 
 	
-	reconstruct(imageData,height,width*3,image_header_data,bitmap_offset,"Testout2.bmp");
-*/
+	reconstruct(imageData,height,image_width,image_header_data,bitmap_offset,"Testout2.bmp");
+
 
 /*
  *	So now imageData has the Subband Decomposition of the oringal image (decomposed twice).
