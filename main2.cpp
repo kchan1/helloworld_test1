@@ -4,6 +4,150 @@
 #include <cmath>
 using namespace std;
 
+void horizontal_convolution(double* &image, int image_length,  double* filter, int filter_length){
+	double copy[image_length];
+	double pass_value;
+	for (int i=0; i<image_length;i++){
+		copy[i] = image[i];
+	}
+	int offset = filter_length/2;
+
+	for (int i = offset; i<image_length+offset; i++){
+		pass_value = 0;		
+		for (int j = 0; j<filter_length; j++){
+			if (i-j < 0  || i-j >= image_length){
+				continue;
+			}
+			pass_value +=filter[j]*copy[i-j];
+		}
+		image[i-offset]=pass_value;
+	}
+
+	return;
+}
+
+void vertical_convolution(double** &image, int height, int width,  double* filter, int filter_length){
+	double copy[height][width];
+	double pass_value;
+	for (int i=0; i<height ;i++){
+		for (int j = 0; j<width ; j++){
+			copy[i][j] = image[i][j];
+		}
+	}
+	int offset = filter_length/2;
+
+	for (int i=0; i<width; i++){
+		for(int j = offset ; j<height+offset; j++){
+			pass_value=0;
+			for (int k =0; k<filter_length; k++){
+				if(j-k < 0  || j-k >= height){
+					continue;
+				}
+				pass_value+=filter[k]*copy[j-k][i];
+			}
+			image[j-offset][i]=pass_value;
+		}
+	}
+
+
+	return;
+}
+
+
+
+void subband_recomp(double** &image_data, int height, int width){
+	double low_pass_filter[7] = {.2,.6,.7,.2,-.3,0,.1};
+	double high_pass_filter[7] = {-.1,0,.3,.2,-.7,.6,-.2};
+
+	double** round1_low = new double*[height];
+	double** round1_high = new double*[height];
+	double** round2_low = new double*[height];
+	double** round2_high = new double*[height];
+
+	for (int i = 0; i<height; i++){
+		round1_low[i] = new double[width];
+		round1_high[i] = new double[width];
+		round2_low[i] = new double[width];
+		round2_high[i] = new double[width];
+	}
+
+	for (int i=0; i <height; i++){
+		for(int j=0; j<width; j++){
+			round1_low[i][j] = 0;
+			round1_high[i][j] = 0;
+			round2_low[i][j] = 0;
+			round2_high[i][j] = 0;
+		}		
+	}
+
+	//cout<<height/2<<" "<<width/2<<endl;
+
+	for (int i=0; i<(int)(height/2); i++){
+		for(int j=0; j<(int)(width/2);j++){
+			round1_low[i*2][j*2]=(double)image_data[i][j];
+			round2_low[i*2][j*2]=(double)image_data[i+height/2][j];
+			round1_high[i*2][j*2]=(double)image_data[i+height/2][j+width/2];
+			round2_high[i*2][j*2]=(double)image_data[i][j+width/2];
+		}
+	}
+
+	/*for (int i = 0; i<height; i++){
+		for(int j =0; j<width;j++){
+			cout<<(int)round1_low[i][j]<<" ";
+		}
+		cout<<endl;
+	}*/
+
+	vertical_convolution(round1_low,height,width,low_pass_filter,7);
+	vertical_convolution(round2_low,height,width,high_pass_filter,7);
+	vertical_convolution(round1_high,height,width,high_pass_filter,7);
+	vertical_convolution(round2_high,height,width,low_pass_filter,7);
+
+	//COMBINATION SECTION GO!
+
+	for (int i=0; i<height; i++){
+		for(int j=0; j<width; j++){
+			round1_low[i][j] = round1_low[i][j]+round2_low[i][j];
+			//round1_low[i][j] = round2_low[i][j];
+			round1_high[i][j] = round1_high[i][j]+round2_high[i][j];
+			//round1_high[i][j] = round2_high[i][j];
+		}
+	}	
+
+	for(int i=0; i<height; i++){
+		horizontal_convolution(round1_low[i],width,low_pass_filter,7);
+		horizontal_convolution(round1_high[i],width,high_pass_filter,7);
+	}
+
+	for (int i=0; i<height; i++){
+		for(int j=0; j<width; j++){
+			image_data[i][j] = round1_low[i][j]+round1_high[i][j];
+			image_data[i][j]*=.80;
+			//image_data[i][j];
+		}
+	}
+
+}
+
+//creates an image withe name filename that has the same header information
+void reconstruct(unsigned char** image_data, int height, int width, 
+	       	unsigned char* image_header_data, int bitmap_offset,
+		std::string filename){
+
+	filename+=".bmp";
+	std::ofstream output_file;
+
+	output_file.open(filename.c_str(), std::ofstream::out | std::ofstream::binary);
+	output_file.write(reinterpret_cast<const char*>(image_header_data), bitmap_offset);
+	
+
+	for (int i = 0; i< height; i++){
+		output_file.write(reinterpret_cast<const char*>(image_data[i]),width);
+	}
+	output_file.close();
+	return;
+}
+
 int main(int argc, char * arg[])
 
 {	
@@ -79,17 +223,19 @@ int main(int argc, char * arg[])
 	unsigned char* image_header_data= new unsigned char[bitmap_offset];
 	//holds the raw input image data BUT also the raw input image output
 	unsigned char** imageData=new unsigned char*[height];
+	double** image_data = new double*[height];
 	//holds the image data separated into colors
-	unsigned char** blue_data=new unsigned char*[height];
-	unsigned char** green_data=new unsigned char*[height];
-	unsigned char** red_data=new unsigned char*[height];
+	double** blue_data=new double*[height];
+	double** green_data=new double*[height];
+	double** red_data=new double*[height];
 
 	//further initialize 2D arrays
 	for (int i = 0; i<height; i++){
 		imageData[i] = new unsigned char[width*3];
-		blue_data[i] = new unsigned char[width];
-		green_data[i] = new unsigned char[width];
-		red_data[i] = new unsigned char[width];
+		image_data[i] = new double[width*3];
+		blue_data[i] = new double[width];
+		green_data[i] = new double[width];
+		red_data[i] = new double[width];
 	}	
 
 	//read the header information(again?) into image_header_data
@@ -97,18 +243,27 @@ int main(int argc, char * arg[])
 	image_file.read(reinterpret_cast<char*>(image_header_data),bitmap_offset);
 
 	//Read in the number of Decompisition Loops:
-	image_file.read(reinterpret_cast<char*>(num_decomps_data),1);
-	num_decomps=(int)num_decomps_data;
+//	image_file.read(reinterpret_cast<char*>(num_decomps_data),1);
+//	num_decomps=(int)num_decomps_data;
+
+//KEN RIGHT HERE READ IN YO STUFF OR SOMETHING, SET IT UP AS the 3 STANDARD COLORS IN DOUBLE FORM?
+//
+//
+//
+//
+//
+//YEAH~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 	//read in the raw image data
+	//Read in the data from the zero-tree things.
+	//reconstruct the zero tree into a matrix of values.
+
+
+
+
+//read in the raw image data
 	for (int i=0; i<height; i++){
-		image_file.read(reinterpret_cast<char*>(blue_data[i]),width);
-	}
-	for (int i=0; i<height; i++){
-		image_file.read(reinterpret_cast<char*>(green_data[i]),width);
-	}
-	for (int i=0; i<height; i++){
-		image_file.read(reinterpret_cast<char*>(red_data[i]),width);
+		image_file.read(reinterpret_cast<char*>(imageData[i]),width*3);
 	}
 
 //	for (int i=0; i<height; i++){
@@ -123,7 +278,27 @@ int main(int argc, char * arg[])
 		}
 		std::cout<<"]"<<std::endl;
 	}*/
-	
+
+	for(int i = 0; i<height; i++){
+		for(int j = 0; j<width*3; j++){
+			image_data[i][j]=imageData[i][j];
+		}
+	}
+
+	//separate imageData into the 3 colors
+	for (int i = 0; i<height; i++){
+		for(int j = 0; j<width*3; j+=3){
+			blue_data[i][j/3] = image_data[i][j];
+		}
+		for(int j = 1; j<width*3; j+=3){
+			green_data[i][j/3] = image_data[i][j];
+		}
+		for(int j=2;j<width*3; j+=3){
+			red_data[i][j/3] = image_data[i][j];
+		}
+	}
+
+
 	//don't need to read the image anymore
 	image_file.close();
 
@@ -146,7 +321,47 @@ int main(int argc, char * arg[])
  *========================================================================
  */
 	int recomp_height= height;
-	int recomp_width;
+	int recomp_width = width;
+	num_decomps =1;
+
+	for (int i = num_decomps; i>=1; i--){
+		recomp_height = height/pow(2,i-1);
+		recomp_width = width/pow(2,i-1);
+		subband_recomp(blue_data,recomp_height,recomp_width);
+		subband_recomp(green_data,recomp_height,recomp_width);
+		subband_recomp(red_data,recomp_height,recomp_width);
+	}
+
+	for (int i = 0; i<height; i++){
+		for(int j = 0; j<width*3; j+=3){
+			image_data[i][j]=blue_data[i][j/3];
+		}
+		for(int j = 1; j<width*3; j+=3){
+			image_data[i][j]=green_data[i][j/3];
+		}
+		for(int j=2;j<width*3; j+=3){
+			image_data[i][j]=red_data[i][j/3];
+		}
+	}
+
+	for (int i=0; i<height; i++){
+		for(int j=0; j<width*3; j++){
+			if (image_data[i][j]<0){
+				image_data[i][j]=0;
+			}
+			if (image_data[i][j]>255){
+				image_data[i][j]=255;
+			}
+		}
+	}
+
+	for(int i = 0; i<height; i++){
+		for(int j = 0; j<width*3; j++){
+			imageData[i][j]=image_data[i][j];
+		}
+	}
+	
+	reconstruct(imageData,height,width*3,image_header_data,bitmap_offset,"Testout2.bmp");
 
 
 //	reconstruct((imageData),height,width*3,image_header_data,bitmap_offset,filename);
