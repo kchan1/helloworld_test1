@@ -12,3 +12,5 @@ all: $(OBJ) $(OBJ2)
 clean:
 	$(RM) $(OUT)
 	$(RM) $(OBJ)
+	$(RM) $(OUT2)
+	$(RM) $(OBJ2)
