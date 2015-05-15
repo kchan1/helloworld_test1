@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <cmath>
 #include "encoder.hh"
+#include <string>
 
 
 void horizontal_convolution(double* &image, int image_length,  double* filter, int filter_length){
@@ -211,7 +212,7 @@ void subband_recomp(double** &image_data, int height, int width){
 
 }
 
-void prepare(double** &image_data, int height, int width){
+void prepare(double** &image_data, int height, int width, int quant){
 	
 	for (int i = 0; i<height; i++){
 		for(int j=0; j<height; j++){
@@ -222,8 +223,8 @@ void prepare(double** &image_data, int height, int width){
 	int max = 0;
 	for (int i = 0; i<height; i++){
 		for(int j=0; j<height; j++){
-			image_data[i][j]=(int)(image_data[i][j]/20)*20;
-			image_data[i][j]=image_data[i][j]/20;
+			image_data[i][j]=(int)(image_data[i][j]/quant)*quant;
+			image_data[i][j]=image_data[i][j]/quant;
 			if (image_data[i][j] < -126){
 				image_data[i][j] = -126;
 			}
@@ -233,7 +234,7 @@ void prepare(double** &image_data, int height, int width){
 			if (abs(image_data[i][j]) > max){
 				max = abs(image_data[i][j]);
 			}
-			image_data[i][j]*=20;
+			//image_data[i][j]*=quant;
 			//std::cout<<image_data[i][j]<<" ";
 		}
 	}
@@ -264,7 +265,7 @@ void reconstruct(unsigned char** image_data, int height, int width,
 void compress(double** &blue_data,double** &green_data, 
 	      double** &red_data, int height,int width,
               unsigned char* &image_header_data, int &bitmap_offset,
-	      std::string filename , int decomposition_loops){
+	      std::string filename , int decomposition_loops, int quant){
 
 	filename+=".205";
 	std::ofstream output_file;
@@ -283,8 +284,14 @@ void compress(double** &blue_data,double** &green_data,
 	
 	output_file.write(reinterpret_cast<const char*>(depth), 1);
 
+	depth[0] = quant;
+
+	output_file.write(reinterpret_cast<const char*>(depth), 1);
+
 	current = blue_data[0][0];
 	how_many[0]=1;
+	//int cout_count = 0;
+	int count = 0;
 
 	for (int i = 0; i<height; i++){
 		for (int j = 0; j<height; j++){
@@ -292,9 +299,14 @@ void compress(double** &blue_data,double** &green_data,
 				value[0] = current;
 				output_file.write(reinterpret_cast<const char*>(how_many), 1);
 				output_file.write(reinterpret_cast<const char*>(value),1);
+				//if(cout_count<49927){
 				//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
+				//cout_count++;
+				//std::cout<<cout_count<<std::endl;
+				//}
 				saved+=how_many[0]-2;
 				current = blue_data[i][j];
+				count+=how_many[0];
 				how_many[0] = 1;
 				continue;		
 			}
@@ -302,17 +314,29 @@ void compress(double** &blue_data,double** &green_data,
 				value[0] =  current;
 				output_file.write(reinterpret_cast<const char*>(how_many), 1);
 				output_file.write(reinterpret_cast<const char*>(value),1);
+				//if(cout_count<49927){
 				//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
+				//cout_count++;
+				//std::cout<<cout_count<<std::endl;
+				//}
 				saved+=how_many[0]-2;
-				how_many[0] = 0;
+				count+=how_many[0];
+				how_many[0] = 1;
 				continue;
 			}
 			how_many[0]++;
 		}
 	}
+	value[0] =  current;
+	output_file.write(reinterpret_cast<const char*>(how_many), 1);
+	output_file.write(reinterpret_cast<const char*>(value),1);
+	//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
+	count+=how_many[0];
+	//std::cout<<count<<std::endl;
 
 	current = green_data[0][0];
 	how_many[0]=1;
+	count=0;
 
 	for (int i = 0; i<height; i++){
 		for (int j = 0; j<height; j++){
@@ -323,6 +347,7 @@ void compress(double** &blue_data,double** &green_data,
 				//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
 				saved+=how_many[0]-2;
 				current = green_data[i][j];
+				count+=how_many[0];
 				how_many[0] = 1;
 				continue;		
 			}
@@ -332,15 +357,22 @@ void compress(double** &blue_data,double** &green_data,
 				output_file.write(reinterpret_cast<const char*>(value),1);
 				//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
 				saved+=how_many[0]-2;
-				how_many[0] = 0;
+				count+=how_many[0];
+				how_many[0] = 1;
 				continue;
 			}
 			how_many[0]++;
 		}
 	}
+	value[0] =  current;
+	output_file.write(reinterpret_cast<const char*>(how_many), 1);
+	output_file.write(reinterpret_cast<const char*>(value),1);
+	count+=how_many[0];
+	//std::cout<<count<<std::endl;
 
 	current = red_data[0][0];
 	how_many[0]=1;
+	count = 0;
 
 	for (int i = 0; i<height; i++){
 		for (int j = 0; j<height; j++){
@@ -350,6 +382,7 @@ void compress(double** &blue_data,double** &green_data,
 				output_file.write(reinterpret_cast<const char*>(value),1);
 				//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
 				saved+=how_many[0]-2;
+				count+=how_many[0];
 				current = red_data[i][j];
 				how_many[0] = 1;
 				continue;		
@@ -360,14 +393,20 @@ void compress(double** &blue_data,double** &green_data,
 				output_file.write(reinterpret_cast<const char*>(value),1);
 				//std::cout<<(int)how_many[0]<<" "<<(int)value[0]<<std::endl;
 				saved+=how_many[0]-2;
-				how_many[0] = 0;
+				count+=how_many[0];
+				how_many[0] = 1;
 				continue;
 			}
 			how_many[0]++;
 		}
 	}
+	value[0] =  current;
+	output_file.write(reinterpret_cast<const char*>(how_many), 1);
+	output_file.write(reinterpret_cast<const char*>(value),1);
+	count+=how_many[0];
+	//std::cout<<count<<std::endl;	
 
-	std::cout<<saved<<std::endl;
+	//std::cout<<saved<<std::endl;
 	
 	output_file.close();
 	return;
@@ -382,6 +421,39 @@ int main(int argc, char * arg[])
 		std::cout<<"Error: No filename submitted. Please input filename."<<std::endl;
 		return 1;
 	}
+
+	int quant;
+
+	if (argc >= 3){
+		int arg2i = atoi(arg[2]);
+		if (arg2i>=1){
+			quant = arg2i;	
+		}
+		else{
+		std::cout<<"Error: Qunatization scale must be a positive non-zero number."<<std::endl;
+		return 1;
+		}
+	}
+	else{
+		quant = 20;
+	}
+
+	int depth;
+
+	if (argc >= 4){
+		int arg3i = atoi(arg[3]);
+		if (arg3i>=1){
+			depth = arg3i;	
+		}
+		else{
+		std::cout<<"Error: Depth scale must be a positive non-zero number."<<std::endl;
+		return 1;
+		}
+	}
+	else{
+		depth = 1;
+	}
+	
 
 	//for handling the file
 	std::string filename = arg[1];
@@ -540,7 +612,7 @@ int main(int argc, char * arg[])
 	
 	int decomp_height = height;
 	int decomp_width = width;
-	int decomposition_loops = 1;
+	int decomposition_loops = depth;
 	
 	//for the number of loops (hardcoded 3) decompose the arrays
 	//each iteration creates the quarter-subarays for LL, LH, HL, HH
@@ -600,16 +672,16 @@ int main(int argc, char * arg[])
 		std::cout<<std::endl;
 	}*/
 	
-	reconstruct(imageData,height,image_width,image_header_data,bitmap_offset,"Testout.bmp");
+	reconstruct(imageData,height,image_width,image_header_data,bitmap_offset,filename+"subband");
 
 	
 	int recomp_height= height;
 	int recomp_width = width;
-	int num_decomps =1;
+	int num_decomps = decomposition_loops;
 
-	prepare(blue_data,height,width);
-	prepare(green_data,height,width);
-	prepare(red_data,height,width);
+	prepare(blue_data,height,width,quant);
+	prepare(green_data,height,width,quant);
+	prepare(red_data,height,width,quant);
 
 	/*for(int i = 0; i<height; i++){
 		for(int j = 0; j<width; j++){
@@ -617,9 +689,13 @@ int main(int argc, char * arg[])
 		}
 	}*/
 
-	compress(blue_data,green_data,red_data,height,width,image_header_data,bitmap_offset,"compress",decomposition_loops);
+	//for (int i = 0; i<20; i++){
+	//	std::cout<<red_data[2][i]*20<<std::endl;
+	//}
+
+	compress(blue_data,green_data,red_data,height,width,image_header_data,bitmap_offset,filename,decomposition_loops,quant);
 	
-	for (int i = 0; i<height; i++){
+	/*for (int i = 0; i<height; i++){
 		for(int j = 0; j<image_width; j+=3){
 			image_data_char[i][j]=blue_data[i][j/3];
 		}
@@ -675,7 +751,7 @@ int main(int argc, char * arg[])
 
 	
 	reconstruct(imageData,height,image_width,image_header_data,bitmap_offset,"Testout2.bmp");
-
+*/
 
 /*
  *	So now imageData has the Subband Decomposition of the oringal image (decomposed twice).

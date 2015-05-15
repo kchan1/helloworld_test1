@@ -170,9 +170,15 @@ int main(int argc, char * arg[])
 	//secondary buffers for interpretting the header
 	int bitmap_offset=0;
 	int width =0;
+	int image_width = 0;
 	int height =0;
 	int pixel_bits=0;
 	int num_decomps=0;
+	char char_reader[1];
+	unsigned char uchar_reader[1];
+	int total_char;
+	int limit_char;
+	int quant = 20;
 	
 	//start reading 10 bytes after the beginning of the file
 	image_file.open(filename.c_str(), std::ifstream::in | std::ifstream::binary);
@@ -196,6 +202,10 @@ int main(int argc, char * arg[])
 	for(int i=0; i<4; i++){
 		width+=(int)width_data[i]*pow(2,i*8);
 	}
+	width = (int)((3*8*width+31)/(32))*4;
+	image_width = width;
+	width /= 3;
+
 	//read 4 bytes as the height
 	image_file.read(reinterpret_cast<char*>(height_data),4);
 	for(int i=0; i<4; i++){
@@ -231,8 +241,8 @@ int main(int argc, char * arg[])
 
 	//further initialize 2D arrays
 	for (int i = 0; i<height; i++){
-		imageData[i] = new unsigned char[width*3];
-		image_data[i] = new double[width*3];
+		imageData[i] = new unsigned char[image_width];
+		image_data[i] = new double[image_width];
 		blue_data[i] = new double[width];
 		green_data[i] = new double[width];
 		red_data[i] = new double[width];
@@ -243,28 +253,115 @@ int main(int argc, char * arg[])
 	image_file.read(reinterpret_cast<char*>(image_header_data),bitmap_offset);
 
 	//Read in the number of Decompisition Loops:
-//	image_file.read(reinterpret_cast<char*>(num_decomps_data),1);
-//	num_decomps=(int)num_decomps_data;
+	image_file.read(reinterpret_cast<char*>(uchar_reader),1);
+	num_decomps=(int)uchar_reader[0];
+	//cout<<num_decomps<<endl;
+	
+	image_file.read(reinterpret_cast<char*>(uchar_reader),1);
+	quant=(int)uchar_reader[0];
+	//cout<<num_decomps<<endl;
 
-//KEN RIGHT HERE READ IN YO STUFF OR SOMETHING, SET IT UP AS the 3 STANDARD COLORS IN DOUBLE FORM?
-//
-//
-//
-//
-//
-//YEAH~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	//image_file.seekg(-2, std::ifstream::cur);
+	total_char = 0;
+	limit_char = width*height;
+	int tempi = 0;
+	int tempj = 0;
+	//int cout_count = 0;
+
+	while(tempi!=height){
+		image_file.read(reinterpret_cast<char*>(uchar_reader),1);
+		image_file.read(reinterpret_cast<char*>(char_reader),1);
+		//if(cout_count <49927){
+		//cout<<(int)uchar_reader[0]<<" "<<(int)char_reader[0]<<endl;
+		//cout_count++;
+		//cout<<cout_count<<endl;
+		//}
+		for(int k = 0; k<(int)uchar_reader[0]; k++){
+			//cout<<"Trying to read..."<<endl;
+			blue_data[tempi][tempj] = char_reader[0]*quant;
+			total_char++;
+			tempj++;
+			if(tempj == width){
+				tempj = 0;
+				tempi++;
+				if(tempi == height){
+					break;
+				}	
+			}
+			//cout<<tempi<<" "<<tempj<<endl;
+		}
+				
+	}	
+	//image_file.seekg(-2, std::ifstream::cur);
+	total_char = 0;
+	limit_char = width*height;
+	tempi = 0;
+	tempj = 0;
+
+	while(tempi!=height){
+		image_file.read(reinterpret_cast<char*>(uchar_reader),1);
+		image_file.read(reinterpret_cast<char*>(char_reader),1);
+		//cout<<(int)uchar_reader[0]<<" "<<(int)char_reader[0]<<endl;
+		for(int k = 0; k<(int)uchar_reader[0]; k++){
+			//cout<<"Trying to read..."<<endl;
+			green_data[tempi][tempj] = char_reader[0]*quant;
+			total_char++;
+			tempj++;
+			if(tempj == width){
+				tempj = 0;
+				tempi++;
+				if(tempi == height){
+					break;
+				}	
+			}
+			//cout<<tempi<<" "<<tempj<<endl;
+		}
+				
+	}	
+
+	//image_file.seekg(-2, std::ifstream::cur);
+	total_char = 0;
+	limit_char = width*height;
+	tempi = 0;
+	tempj = 0;
+
+	while(tempi!=height){
+		image_file.read(reinterpret_cast<char*>(uchar_reader),1);
+		image_file.read(reinterpret_cast<char*>(char_reader),1);
+		//cout<<(int)uchar_reader[0]<<" "<<(int)char_reader[0]<<endl;
+		for(int k = 0; k<(int)uchar_reader[0]; k++){
+			//cout<<"Trying to read..."<<endl;
+			red_data[tempi][tempj] = char_reader[0]*quant;
+			//red_data[tempi][tempj] = 0;			
+			total_char++;
+			tempj++;
+			if(tempj == width){
+				tempj = 0;
+				tempi++;
+				if(tempi == height){
+					break;
+				}	
+			}
+			//cout<<tempi<<" "<<tempj<<endl;
+		}
+				
+	}	
+
+	//for (int i = 0; i<20; i++){
+	//	cout<<red_data[2][i]<<endl;
+	//}	
 
 	//read in the raw image data
 	//Read in the data from the zero-tree things.
 	//reconstruct the zero tree into a matrix of values.
 
-
+	
 
 
 //read in the raw image data
-	for (int i=0; i<height; i++){
-		image_file.read(reinterpret_cast<char*>(imageData[i]),width*3);
-	}
+	//for (int i=0; i<height; i++){
+//image_file.read(reinterpret_cast<char*>(imageData[i]),width*3);
+	//}
 
 //	for (int i=0; i<height; i++){
 //		std::cout<<imageData[i]<<" ";
@@ -279,7 +376,7 @@ int main(int argc, char * arg[])
 		std::cout<<"]"<<std::endl;
 	}*/
 
-	for(int i = 0; i<height; i++){
+	/*for(int i = 0; i<height; i++){
 		for(int j = 0; j<width*3; j++){
 			image_data[i][j]=imageData[i][j];
 		}
@@ -295,6 +392,12 @@ int main(int argc, char * arg[])
 		}
 		for(int j=2;j<width*3; j+=3){
 			red_data[i][j/3] = image_data[i][j];
+		}
+	}*/
+
+	for (int i = 0; i<height; i++){
+		for(int j = 0; j<width; j++){
+			imageData[i][j]=(unsigned char)0;
 		}
 	}
 
@@ -322,7 +425,6 @@ int main(int argc, char * arg[])
  */
 	int recomp_height= height;
 	int recomp_width = width;
-	num_decomps =1;
 
 	for (int i = num_decomps; i>=1; i--){
 		recomp_height = height/pow(2,i-1);
@@ -333,19 +435,19 @@ int main(int argc, char * arg[])
 	}
 
 	for (int i = 0; i<height; i++){
-		for(int j = 0; j<width*3; j+=3){
+		for(int j = 0; j<image_width; j+=3){
 			image_data[i][j]=blue_data[i][j/3];
 		}
-		for(int j = 1; j<width*3; j+=3){
+		for(int j = 1; j<image_width; j+=3){
 			image_data[i][j]=green_data[i][j/3];
 		}
-		for(int j=2;j<width*3; j+=3){
+		for(int j=2;j<image_width; j+=3){
 			image_data[i][j]=red_data[i][j/3];
 		}
 	}
 
 	for (int i=0; i<height; i++){
-		for(int j=0; j<width*3; j++){
+		for(int j=0; j<image_width; j++){
 			if (image_data[i][j]<0){
 				image_data[i][j]=0;
 			}
@@ -356,12 +458,12 @@ int main(int argc, char * arg[])
 	}
 
 	for(int i = 0; i<height; i++){
-		for(int j = 0; j<width*3; j++){
+		for(int j = 0; j<image_width; j++){
 			imageData[i][j]=image_data[i][j];
 		}
 	}
 	
-	reconstruct(imageData,height,width*3,image_header_data,bitmap_offset,"Testout2.bmp");
+	reconstruct(imageData,height,image_width,image_header_data,bitmap_offset,filename);
 
 
 //	reconstruct((imageData),height,width*3,image_header_data,bitmap_offset,filename);
