@@ -360,9 +360,6 @@ int main(int argc, char * arg[])
 			imageData[i][j]=image_data[i][j];
 		}
 	}
-
-	char toast = -5;
-	cout<<(int)toast<<endl;
 	
 	reconstruct(imageData,height,width*3,image_header_data,bitmap_offset,"Testout2.bmp");
 
